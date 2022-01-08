@@ -52,7 +52,7 @@ parser.add_argument('--depth', default=32, type=int,
 parser.add_argument('--no-bottleneck', dest='bottleneck', action='store_false',
                     help='to use basicblock for CIFAR datasets (default: bottleneck)')
 parser.add_argument('--dataset', dest='dataset', default='imagenet', type=str,
-                    help='dataset (options: cifar10, cifar100, and imagenet)')
+                    help='Folder containing the dataset')
 parser.add_argument('--no-verbose', dest='verbose', action='store_false',
                     help='to print the status at every iteration')
 parser.add_argument('--alpha', default=300, type=float,
@@ -63,8 +63,6 @@ parser.add_argument('--beta', default=0, type=float,
                     help='hyperparameter beta')
 parser.add_argument('--cutmix_prob', default=0, type=float,
                     help='cutmix probability')
-parser.add_argument('--dataset', default='data', type=str,
-                    help='Folder containing the dataset')
 
 parser.set_defaults(bottleneck=True)
 parser.set_defaults(verbose=True)
@@ -88,7 +86,7 @@ def main():
     numberofclass = 100
 
 
-    print("=> creating model '{}'".format(args.net_type))
+    print("=> creating model")
     model = trained_models.resnet18(pretrained = True)
 
     model = torch.nn.DataParallel(model).cuda()
@@ -297,13 +295,7 @@ class AverageMeter(object):
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    if args.dataset.startswith('cifar'):
-        lr = args.lr * (0.1 ** (epoch // (args.epochs * 0.5))) * (0.1 ** (epoch // (args.epochs * 0.75)))
-    elif args.dataset == ('imagenet'):
-        if args.epochs == 300:
-            lr = args.lr * (0.1 ** (epoch // 75))
-        else:
-            lr = args.lr * (0.1 ** (epoch // 30))
+    lr = args.lr * (0.1 ** (epoch // (args.epochs * 0.5))) * (0.1 ** (epoch // (args.epochs * 0.75)))
 
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
