@@ -78,10 +78,10 @@ def main():
     transform_train, transform_test = get_base_transform(224)
     dataset = args.dataset
 
-    trainset = datasets.ImageFolder(dataset, transform=transform_train)
+    trainset, testset = get_train_test_dataset(dataset, transform_train, transform_test)
+
     train_loader = torch.utils.data.DataLoader(trainset,
         batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
-    testset = datasets.ImageFolder(dataset, transform=transform_test)
     val_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
     numberofclass = 100
 
