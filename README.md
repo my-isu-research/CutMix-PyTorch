@@ -1,3 +1,6 @@
+## UPDATE
+Updated the CutMix code base to run on 224 * 224 medical image datasets
+
 ## Accepted at ICCV 2019 (oral talk) !!
 
 ## CutMix: Regularization Strategy to Train Strong Classifiers with Localizable Features
