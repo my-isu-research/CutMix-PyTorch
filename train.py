@@ -21,6 +21,9 @@ import utils
 import numpy as np
 from extras import *
 import torchvision.models as trained_models
+import sys
+from first import *
+import pandas as pd
 
 import warnings
 
@@ -63,6 +66,8 @@ parser.add_argument('--beta', default=0, type=float,
                     help='hyperparameter beta')
 parser.add_argument('--cutmix_prob', default=0, type=float,
                     help='cutmix probability')
+parser.add_argument('--iterations', default=1, type=int,
+                    help='Number of experiments to run')
 
 parser.set_defaults(bottleneck=True)
 parser.set_defaults(verbose=True)
@@ -70,66 +75,89 @@ parser.set_defaults(verbose=True)
 best_err1 = 100
 best_err5 = 100
 
+result_df = pd.DataFrame(columns = ['Test_Acc', 'Test, Pre', 'Test_Re', 'Test_F1', 'Train_Acc',
+'Train_Pre', 'Train_Re', 'Train_F1'])
 
 def main():
-    global args, best_err1, best_err5
+    global args, best_err1, best_err5, result_df
     args = parser.parse_args()
 
-    transform_train, transform_test = get_base_transform(224)
-    dataset = args.dataset
+    for iter in range(args.iterations):
+        best_err1 = 100
+        best_err5 = 100
 
-    trainset, testset = get_train_test_dataset(dataset, transform_train, transform_test)
+        transform_train, transform_test = get_base_transform(224)
+        dataset = args.dataset
 
-    train_loader = torch.utils.data.DataLoader(trainset,
-        batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
-    val_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
-    numberofclass = 100
+        trainset, testset = get_train_test_dataset(dataset, transform_train, transform_test)
+
+        train_loader = torch.utils.data.DataLoader(trainset,
+            batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
+        val_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
 
 
-    print("=> creating model")
-    model = trained_models.resnet18(pretrained = True)
+        print("=> creating model")
+        model = trained_models.resnet18(pretrained = True)
 
-    model = torch.nn.DataParallel(model).cuda()
+        num_ftrs = model.fc.in_features
+        model.fc = nn.Linear(num_ftrs, len(testset.classes))
+        model = torch.nn.DataParallel(model).cuda()
 
-    print(model)
-    print('the number of model parameters: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
+        print(model)
+        print('the number of model parameters: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
 
-    # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss().cuda()
+        # define loss function (criterion) and optimizer
+        criterion = nn.CrossEntropyLoss().cuda()
 
-    optimizer = torch.optim.SGD(model.parameters(), args.lr,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay, nesterov=True)
+        optimizer = torch.optim.SGD(model.parameters(), args.lr,
+                                    momentum=args.momentum,
+                                    weight_decay=args.weight_decay, nesterov=True)
 
-    cudnn.benchmark = True
+        cudnn.benchmark = True
 
-    for epoch in range(0, args.epochs):
+        for epoch in range(0, args.epochs):
 
-        adjust_learning_rate(optimizer, epoch)
+            adjust_learning_rate(optimizer, epoch)
 
-        # train for one epoch
-        train_loss = train(train_loader, model, criterion, optimizer, epoch)
+            # train for one epoch
+            train_loss = train(train_loader, model, criterion, optimizer, epoch)
 
-        # evaluate on validation set
-        err1, err5, val_loss = validate(val_loader, model, criterion, epoch)
+            # evaluate on validation set
+            err1, err5, val_loss = validate(val_loader, model, criterion, epoch)
 
-        # remember best prec@1 and save checkpoint
-        is_best = err1 <= best_err1
-        best_err1 = min(err1, best_err1)
-        if is_best:
-            best_err5 = err5
+            # remember best prec@1 and save checkpoint
+            is_best = err1 <= best_err1
+            best_err1 = min(err1, best_err1)
+            if is_best:
+                best_err5 = err5
 
-        print('Current best accuracy (top-1 and 5 error):', best_err1, best_err5)
-        save_checkpoint({
-            'epoch': epoch,
-            'arch': args.net_type,
-            'state_dict': model.state_dict(),
-            'best_err1': best_err1,
-            'best_err5': best_err5,
-            'optimizer': optimizer.state_dict(),
-        }, is_best)
+            print('Current best accuracy (top-1 and 5 error):', best_err1, best_err5)
+            save_checkpoint({
+                'epoch': epoch,
+                'arch': args.net_type,
+                'state_dict': model.state_dict(),
+                'best_err1': best_err1,
+                'best_err5': best_err5,
+                'optimizer': optimizer.state_dict(),
+            }, is_best)
 
-    print('Best accuracy (top-1 and 5 error):', best_err1, best_err5)
+
+        trainset, trainloader, testset, testloader = get_loaders_and_dataset(dataset, transform_train, transform_test, args.batch_size)
+        targets, preds, _ = make_prediction(model, testset.classes, testloader)
+        test_class_report = classification_report(targets, preds, target_names=testset.classes)
+        test_metrics = get_metrics_from_classi_report(test_class_report)
+
+        targets, preds, _ = make_prediction(model, testset.classes, trainloader)
+        train_class_report = classification_report(targets, preds, target_names=testset.classes)
+        train_metrics = get_metrics_from_classi_report(train_class_report)
+
+        print(test_metrics)
+        metrics = []
+        metrics.extend(test_metrics)
+        metrics.extend(train_metrics)
+        result_df.loc[len(result_df.index)] = metrics
+        result_df.to_csv('experimental_results_for_cutmix.csv')
+        print('Best accuracy (top-1 and 5 error):', best_err1, best_err5)
 
 
 def train(train_loader, model, criterion, optimizer, epoch):
