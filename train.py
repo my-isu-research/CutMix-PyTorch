@@ -24,53 +24,11 @@ import torchvision.models as trained_models
 import sys
 from first import *
 import pandas as pd
+import config as args
 
 import warnings
 
 warnings.filterwarnings("ignore")
-
-model_names = sorted(name for name in models.__dict__
-                     if name.islower() and not name.startswith("__")
-                     and callable(models.__dict__[name]))
-
-parser = argparse.ArgumentParser(description='Cutmix PyTorch CIFAR-10, CIFAR-100 and ImageNet-1k Training')
-parser.add_argument('--net_type', default='pyramidnet', type=str,
-                    help='networktype: resnet, and pyamidnet')
-parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
-                    help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=90, type=int, metavar='N',
-                    help='number of total epochs to run')
-parser.add_argument('-b', '--batch_size', default=128, type=int,
-                    metavar='N', help='mini-batch size (default: 256)')
-parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
-                    metavar='LR', help='initial learning rate')
-parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
-                    help='momentum')
-parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
-                    metavar='W', help='weight decay (default: 1e-4)')
-parser.add_argument('--print-freq', '-p', default=1, type=int,
-                    metavar='N', help='print frequency (default: 10)')
-parser.add_argument('--depth', default=32, type=int,
-                    help='depth of the network (default: 32)')
-parser.add_argument('--no-bottleneck', dest='bottleneck', action='store_false',
-                    help='to use basicblock for CIFAR datasets (default: bottleneck)')
-parser.add_argument('--dataset', dest='dataset', default='imagenet', type=str,
-                    help='Folder containing the dataset')
-parser.add_argument('--no-verbose', dest='verbose', action='store_false',
-                    help='to print the status at every iteration')
-parser.add_argument('--alpha', default=300, type=float,
-                    help='number of new channel increases per depth (default: 300)')
-parser.add_argument('--expname', default='TEST', type=str,
-                    help='name of experiment')
-parser.add_argument('--beta', default=0, type=float,
-                    help='hyperparameter beta')
-parser.add_argument('--cutmix_prob', default=0, type=float,
-                    help='cutmix probability')
-parser.add_argument('--iterations', default=1, type=int,
-                    help='Number of experiments to run')
-
-parser.set_defaults(bottleneck=True)
-parser.set_defaults(verbose=True)
 
 best_err1 = 100
 best_err5 = 100
@@ -80,7 +38,6 @@ result_df = pd.DataFrame(columns = ['Test_Acc', 'Test, Pre', 'Test_Re', 'Test_F1
 
 def main():
     global args, best_err1, best_err5, result_df
-    args = parser.parse_args()
 
     for iter in range(args.iterations):
         best_err1 = 100
